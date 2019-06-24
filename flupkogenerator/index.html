@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="X-UA-Compatible" content="ie=edge" />
+    <title>Flupkogenerator</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        height: 100%;
+        background: #1f1a4d;
+      }
+
+      /* Scale canvas with resize attribute to full size */
+      canvas[resize] {
+        width: 100%;
+        height: 100%;
+      }
+      .logo {
+        position: absolute;
+        top: 2%;
+        left: 2%;
+        transform: translate(0%, -2%);
+        z-index: 10;
+        width: 5vw;
+      }
+    </style>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paper.js/0.12.1/paper-full.js"></script>
+    <script type="text/paperscript" canvas="canvas">
+       var playing = false;
+
+       var oldPath = [];
+       var mousePos = view.center + [view.bounds.width / 3, 100];
+
+       var position = view.center;
+
+
+       var downloadAsSVG = function (fileName) {
+
+         if(!fileName) {
+             fileName = "paperjs_example.svg"
+         }
+
+         var url = "data:image/svg+xml;utf8," + encodeURIComponent(project.exportSVG({asString:true}));
+
+         var link = document.createElement("a");
+         link.download = fileName;
+         link.href = url;
+         link.click();
+      }
+
+       function onFrame(event) {
+         position += (mousePos - position) / 10;
+         var vector = (view.center - position) / 10;
+
+         moveRainbow(vector, event);
+       }
+
+       function onMouseMove(event) {
+         mousePos = event.point;
+       }
+
+       function onKeyDown(event) {
+         if (event.key == "space") downloadAsSVG();
+       }
+
+       var moveRainbow = new (function() {
+         var totalPoints = 1200;
+         var gap = 50;
+         var limit = 12000;
+         var lastPath;
+         var lastIndex = 0;
+         var currentPoint = 0;
+         var pathCount = gap;
+         var startCol = [1, 161, 118];
+         var endCol = [54, 56, 148];
+         var colSwitch = startCol;
+         var oldCol = startCol;
+         var currentStart = startCol;
+         var currentEnd = [0, 0, 0];
+         var colCount = 0;
+         var ratio = gap/totalPoints*2;
+
+         var headGroup;
+
+
+
+
+         for(var i = 0; i<3 ; i++){
+           currentEnd[i] = currentStart[i] + ratio * (endCol[i] - currentStart[i]);
+           console.log(currentEnd[i]);
+         }
+
+
+
+
+         var path = new Path({
+           fillColor: {
+             gradient: {
+               stops: [
+                 "rgb(" + currentStart[0] + "," + currentStart[1] + "," + currentStart[2] + ")",
+                 "rgb(" + currentEnd[0] + "," + currentEnd[1] + "," + currentEnd[2] + ")"
+               ]
+             },
+             origin: view.center,
+             destination: event.point
+           }
+         });
+
+         function createHead(vector, count) {
+
+          if (headGroup)
+            headGroup.remove();
+          var top = path.lastSegment.point;
+          var bottom = path.firstSegment.point;
+          var radius = (bottom - top).length / 2;
+          var circle = new Path.Circle({
+            center: top + (bottom - top) / 2,
+            radius: radius,
+            fillColor: {
+              gradient: {
+                stops: [
+                  "rgb(" + currentStart[0] + "," + currentStart[1] + "," + currentStart[2] + ")",
+                  "rgb(" + currentEnd[0] + "," + currentEnd[1] + "," + currentEnd[2] + ")"
+                ]
+              },
+              origin: top,
+              destination: bottom
+            }
+          });
+          circle.scale(vector.length / 50 + 0.6, 1);
+          circle.rotate(vector.angle, circle.center);
+
+
+          headGroup = new Group(circle);
+        }
+
+         var count = 600;
+
+         return function(vector, event) {
+           var vector = (view.center - position) / 10;
+
+           if (vector.length < 10) vector.length = 10;
+           count += vector.length / 1000;
+           path.translate(vector);
+           for (index = 0; index < oldPath.length; index++) {
+             if (oldPath[index] != null) oldPath[index].translate(vector);
+           }
+           var rotated = vector.rotate(90);
+           var middle = 1 /20;
+           var nyanSwing = Math.abs(Math.sin(event.count / 20 + 0.6));
+           var unitLength = vector.length * (2 + nyanSwing)  + nyanSwing;
+           var length = middle * unitLength;
+           var top = view.center + rotated.normalize(length) * nyanSwing;
+           var bottom = view.center + rotated.normalize(unitLength) ;
+           path.add(top);
+           path.insert(0, bottom);
+           currentPoint += 2;
+
+
+
+
+
+           if (oldPath[0]) {
+           path.fillColor = {
+             gradient: {
+               stops: [
+                 "rgb(" + currentStart[0] + "," + currentStart[1] + "," + currentStart[2] + ")",
+                 "rgb(" + currentEnd[0] + "," + currentEnd[1] + "," + currentEnd[2] + ")"
+               ]
+             },
+             origin: oldPath[oldPath.length-1].segments[0].point,
+             destination: view.center
+           }
+         }
+         else {
+           path.fillColor = {
+             gradient: {
+               stops: [
+                 "rgb(" + currentStart[0] + "," + currentStart[1] + "," + currentStart[2] + ")",
+                 "rgb(" + currentEnd[0] + "," + currentEnd[1] + "," + currentEnd[2] + ")"
+               ]
+             },
+             origin: path.segments[Math.round(path.segments.length / 2)].point,
+             destination: view.center
+           }
+         }
+
+
+           if (path.segments.length > gap) {
+
+             oldPath.push(path);
+
+             if (colCount>=totalPoints){
+               console.log("SWITCH");
+               oldCol = endCol;
+               endCol = colSwitch;
+               colSwitch = oldCol;
+               colCount=0;
+             }
+
+             currentStart = currentEnd;
+             for(var i = 0; i<3 ; i++){
+               currentEnd[i] = currentStart[i] + ratio * (endCol[i] - currentStart[i]);
+             }
+             path = new Path({
+               fillColor: {
+                 gradient: {
+                   stops: [
+                     "rgb(" + currentStart[0] + "," + currentStart[1] + "," + currentStart[2] + ")",
+                     "rgb(" + currentEnd[0] + "," + currentEnd[1] + "," + currentEnd[2] + ")"
+                   ]
+                 },
+                 origin: oldPath[oldPath.length-1].segments[0].point,
+                 destination: view.center
+               }
+             });
+
+             path.add(top);
+             path.insert(0, bottom);
+             currentPoint += 2;
+
+             colCount +=gap;
+             oldPath[lastIndex].smooth();
+           }
+
+           if (currentPoint > totalPoints * 2) {
+             if (pathCount >= 0) lastPath = oldPath[lastIndex];
+             else {
+               lastIndex += 1;
+               lastPath = oldPath[lastIndex];
+               pathCount = gap;
+             }
+             var index = Math.round(lastPath.segments.length / 2);
+             lastPath.segments[index].remove();
+             lastPath.segments[index - 1].remove();
+             pathCount = pathCount - 2;
+             currentPoint -= 2;
+           }
+
+           createHead(vector, event.count);
+         };
+       })();
+    </script>
+  </head>
+  <body>
+    <canvas id="canvas" resize hidpi="off"></canvas>
+    <script type="text/javascript"></script>
+  </body>
+</html>
